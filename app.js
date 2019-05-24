@@ -4,13 +4,28 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var cors = require('cors');
+var mongoose = require('mongoose');
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+var usersRouter = require('./routes/users.routes');
 
 var app = express();
 
 var server = require('http').Server(app);
+
+// Connection to MongoDB with Mongoose
+mongoose.Promise = global.Promise;
+mongoose.pluralize(null);
+mongoose.connect('mongodb://localhost:27017/vueDB', {
+  useNewUrlParser: true,
+})
+.then(() => {
+  // Cuando se realiza la conexión, lanzamos este mensaje por consola
+  console.log("DDBB Connected");
+})
+// Si no se conecta correctamente escupimos el error
+.catch(err => console.log(err));
+
+// Socket.io 
 var io = require('socket.io')(server, {
   path: '/appcom'
 });
@@ -18,6 +33,11 @@ var io = require('socket.io')(server, {
 io.on('connection', function (socket) {
   socket.emit('clientConnected', { connection: true, client: socket.client.id });
   io.emit('userConnected');
+});
+
+app.use(function (req, res, next) {
+  res.io = io;
+  next();
 });
 
 // view engine setup
@@ -31,18 +51,12 @@ var corsOptions = {
 
 app.use(cors(corsOptions));
 
-app.use(function (req, res, next) {
-  res.io = io;
-  next();
-});
-
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
 // catch 404 and forward to error handler
